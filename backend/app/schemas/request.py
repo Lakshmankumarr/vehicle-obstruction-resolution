@@ -1,68 +1,84 @@
 """
-Request API schemas
+Obstruction resolution request schemas.
+Fixes:
+- Section 99 Issue 28: Persists message field
+- Section 99 Issue 29: Normalizes vehicle plate upon request creation
+- Includes ETA, live status, response actions, and history schemas
 """
-from pydantic import BaseModel, Field
-from datetime import datetime
+from typing import Optional, List
 from uuid import UUID
-from typing import List, Optional
-from app.models.request import RequestStatus
+from datetime import datetime
+from pydantic import BaseModel, Field, field_validator
+
+from app.models.request import RequestStatus, ResponseType
+from app.utils.vehicle_validation import normalize_vehicle_number, mask_vehicle_number
 
 
 class CreateRequestRequest(BaseModel):
-    """Request schema for creating a call request"""
-    targetVehicle: str = Field(..., min_length=1, max_length=20)
-    message: Optional[str] = Field(None, max_length=500)
+    """Schema for initiating an obstruction resolution call request."""
+    targetVehicle: str = Field(..., min_length=4, max_length=20, description="License plate of blocking vehicle")
+    message: Optional[str] = Field("Vehicle is blocking access/driveway, please move it.", max_length=500)
+    isEmergency: Optional[bool] = Field(False, description="Emergency priority flag")
+
+    @field_validator("targetVehicle")
+    @classmethod
+    def clean_target(cls, v: str) -> str:
+        clean = normalize_vehicle_number(v)
+        if not clean:
+            raise ValueError("Target vehicle plate cannot be empty")
+        return clean
 
 
 class CreateRequestResponse(BaseModel):
-    """Response schema for request creation"""
+    """Response schema upon request creation."""
     success: bool
     requestId: UUID
-    status: RequestStatus
+    maskedTargetVehicle: str
+    status: str
     expiresAt: datetime
     message: str
-    
-    class Config:
-        from_attributes = True
 
 
 class RespondRequestRequest(BaseModel):
-    """Request schema for responding to a call request"""
+    """Schema for blocking vehicle owner's response."""
     requestId: UUID
-    response: str = Field(..., pattern="^(MESSAGE|ON_MY_WAY|CANNOT_MOVE)$")
-    message: Optional[str] = Field(None, max_length=500)
+    response: ResponseType = Field(..., description="ON_MY_WAY, CANNOT_MOVE, KEYS_WITH_GUARD, MESSAGE")
+    responseMessage: Optional[str] = Field(None, max_length=500)
+    etaMinutes: Optional[int] = Field(None, ge=1, le=120, description="Estimated minutes to move vehicle")
 
 
-class RespondRequestResponse(BaseModel):
-    """Response schema for request response"""
+class RequestActionResponse(BaseModel):
+    """Response returned upon resolving, responding, or cancelling."""
     success: bool
     requestId: UUID
-    status: RequestStatus
+    status: str
     message: str
-    
-    class Config:
-        from_attributes = True
 
 
-class RequestSummary(BaseModel):
-    """Summary of a request for history"""
+class RequestDetailResponse(BaseModel):
+    """Comprehensive request detail schema."""
     id: UUID
-    type: str  # "Sent" or "Received"
-    vehicleNumber: str  # Masked
-    status: RequestStatus
-    createdAt: datetime
-    expiresAt: datetime
-    respondedAt: Optional[datetime]
+    requesterId: UUID
+    targetUserId: UUID
+    maskedTargetVehicle: str
+    status: str
+    message: Optional[str] = None
     response: Optional[str] = None
     responseMessage: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
+    etaMinutes: Optional[int] = None
+    createdAt: datetime
+    expiresAt: datetime
+    respondedAt: Optional[datetime] = None
+    resolvedAt: Optional[datetime] = None
+    isRequester: bool = False
+    isTarget: bool = False
+    remainingSeconds: int = 0
+    formattedCreatedIST: Optional[str] = None
 
 
 class RequestHistoryResponse(BaseModel):
-    """Response schema for request history"""
+    """List of sent/received requests."""
     success: bool
-    requests: List[RequestSummary]
+    sent: List[RequestDetailResponse]
+    received: List[RequestDetailResponse]
     total: int
-    hasMore: bool

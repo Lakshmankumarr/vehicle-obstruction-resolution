@@ -1,81 +1,75 @@
 """
-Request model
-Validates: Requirements 22.1, 22.2, 22.3, 24.2, 24.3, 24.4, 24.5, 24.6
+Request model representing vehicle obstruction resolution requests.
+Fixes:
+- Section 99 Issue 7: Pure timezone-aware UTC timestamps
+- Section 99 Issue 8: Replaced naive IST datetime with DateTime(timezone=True)
+- Section 99 Issue 28: requester's message field is explicitly persisted
+- Supports full resolution lifecycle (PENDING -> ACKNOWLEDGED / ON_MY_WAY / CANNOT_MOVE -> RESOLVED / EXPIRED / CANCELLED)
 """
-from sqlalchemy import Column, String, DateTime, ForeignKey, Enum, Index, CheckConstraint
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
-from datetime import datetime
 import uuid
 import enum
+from sqlalchemy import Column, String, DateTime, ForeignKey, Index, CheckConstraint, Integer
+from sqlalchemy.orm import relationship
 
-from app.core.database import Base
-from app.utils.datetime import now_ist
+from app.core.database import Base, GUID
+from app.utils.datetime import now_utc
 
 
-class RequestStatus(enum.Enum):
-    """Request status enumeration"""
+class RequestStatus(str, enum.Enum):
     PENDING = "PENDING"
-    RESPONDED = "RESPONDED"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+    ON_MY_WAY = "ON_MY_WAY"
+    CANNOT_MOVE = "CANNOT_MOVE"
     RESOLVED = "RESOLVED"
     EXPIRED = "EXPIRED"
     CANCELLED = "CANCELLED"
 
 
-class ResponseType(enum.Enum):
-    """Response type enumeration"""
-    MESSAGE = "MESSAGE"
+class ResponseType(str, enum.Enum):
     ON_MY_WAY = "ON_MY_WAY"
     CANNOT_MOVE = "CANNOT_MOVE"
+    MESSAGE = "MESSAGE"
+    KEYS_WITH_GUARD = "KEYS_WITH_GUARD"
 
 
 class Request(Base):
-    """
-    Request model representing call requests between users
-    
-    Validates:
-    - Requirement 22.1: Every request has a valid requester ID referencing an existing user
-    - Requirement 22.2: Every request has a valid target user ID referencing an existing user
-    - Requirement 22.3: Requester ID and target user ID are different
-    - Requirement 24.2: Index on requesterId for request history queries
-    - Requirement 24.3: Index on targetUserId for request history queries
-    - Requirement 24.4: Index on status for filtering by status
-    - Requirement 24.5: Index on createdAt for expiration job queries
-    - Requirement 24.6: Composite index on (requesterId, createdAt) for rate limiting
-    """
+    """Obstruction resolution request model."""
     __tablename__ = "requests"
-    
+
     # Primary key
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    
-    # Foreign keys
-    requesterId = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    targetUserId = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    
-    # Vehicle information
-    targetVehicle = Column(String(20), nullable=False)
-    
-    # Status tracking
-    status = Column(Enum(RequestStatus), default=RequestStatus.PENDING, nullable=False, index=True)
-    
-    # Timestamps
-    createdAt = Column(DateTime, default=now_ist, nullable=False, index=True)
-    respondedAt = Column(DateTime, nullable=True)
-    expiresAt = Column(DateTime, nullable=False)
-    
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4, index=True)
+
+    # Participants
+    requesterId = Column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    targetUserId = Column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Normalized target vehicle plate
+    targetVehicle = Column(String(20), nullable=False, index=True)
+
+    # Status & content
+    status = Column(String(20), default=RequestStatus.PENDING.value, nullable=False, index=True)
+    message = Column(String(500), nullable=True)  # Section 99 Issue 28: requester message persisted
+
     # Response details
-    response = Column(Enum(ResponseType), nullable=True)
+    response = Column(String(50), nullable=True)
     responseMessage = Column(String(500), nullable=True)
-    
+    etaMinutes = Column(Integer, nullable=True)  # ETA in minutes if ON_MY_WAY
+
+    # Timestamps (Timezone-aware UTC)
+    createdAt = Column(DateTime(timezone=True), default=now_utc, nullable=False, index=True)
+    expiresAt = Column(DateTime(timezone=True), nullable=False, index=True)
+    respondedAt = Column(DateTime(timezone=True), nullable=True)
+    resolvedAt = Column(DateTime(timezone=True), nullable=True)
+
     # Relationships
     requester = relationship("User", foreign_keys=[requesterId], back_populates="sent_requests")
     target_user = relationship("User", foreign_keys=[targetUserId], back_populates="received_requests")
-    
-    # Constraints
+
     __table_args__ = (
-        CheckConstraint('"requesterId" != "targetUserId"', name='check_different_users'),
-        Index('idx_requester_created', 'requesterId', 'createdAt'),  # Composite index for rate limiting
+        CheckConstraint('"requesterId" != "targetUserId"', name="check_different_users"),
+        Index("idx_requester_created", "requesterId", "createdAt"),
+        Index("idx_target_status", "targetUserId", "status"),
     )
-    
+
     def __repr__(self):
-        return f"<Request(id={self.id}, status={self.status}, requesterId={self.requesterId}, targetUserId={self.targetUserId})>"
+        return f"<Request(id={self.id}, status={self.status}, vehicle={self.targetVehicle})>"

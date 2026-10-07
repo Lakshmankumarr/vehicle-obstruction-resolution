@@ -1,72 +1,91 @@
 """
-Vehicle Obstruction Resolution System Backend API
-Main application entry point
+FreeWay Community Backend API
+Production FastAPI Application Entrypoint.
 """
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 from apscheduler.schedulers.background import BackgroundScheduler
+from loguru import logger
 
 from app.core.config import settings
-from app.core.database import engine, Base
+from app.core.database import engine, Base, SessionLocal
 from app.api.v1 import api_router
-from app.services.request_expiration_service import run_expiration_job
+from app.services.request_service import request_service
+from app.services.device_token_service import device_token_service
+from app.models.request import Request, RequestStatus
+from app.utils.datetime import now_utc
 
-
-# Initialize scheduler
 scheduler = BackgroundScheduler()
+
+
+def run_scheduled_maintenance():
+    """Background task to expire old pending requests and purge stale tokens."""
+    db = SessionLocal()
+    try:
+        # 1. Expire requests older than expiresAt
+        now = now_utc()
+        expired_count = db.query(Request).filter(
+            Request.status == RequestStatus.PENDING.value,
+            Request.expiresAt <= now
+        ).update({"status": RequestStatus.EXPIRED.value})
+        db.commit()
+        if expired_count > 0:
+            logger.info("Auto-expired {} pending obstruction requests", expired_count)
+
+        # 2. Cleanup stale push tokens (Section 99 Issue 26)
+        device_token_service.cleanup_stale_tokens(db, max_inactive_days=settings.DATA_RETENTION_DAYS)
+    except Exception as e:
+        logger.error("Maintenance task error: {}", e)
+    finally:
+        db.close()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan events"""
-    # Startup
-    print("Starting Vehicle Obstruction Resolution API...")
+    """Application lifecycle hooks."""
+    logger.info("Initializing FreeWay Community API v{}", settings.VERSION)
     
-    # Initialize Firebase
+    # Create tables on startup for local / test environments
     try:
-        from app.services.firebase_service import firebase_service
-        firebase_service.initialize()
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database schema initialized.")
     except Exception as e:
-        print(f"Warning: Firebase initialization failed: {e}")
-    
-    # Start the request expiration scheduler
-    # Validates Requirement 12.1: Run scheduled job every 5 minutes
+        logger.error("Database schema initialization warning: {}", e)
+
+    # Start background scheduler
     try:
         scheduler.add_job(
-            run_expiration_job,
-            'interval',
-            minutes=5,
-            id='expire_requests',
-            name='Expire pending requests',
+            run_scheduled_maintenance,
+            "interval",
+            minutes=2,
+            id="maintenance_job",
             replace_existing=True
         )
         scheduler.start()
-        print("Request expiration scheduler started (runs every 5 minutes)")
+        logger.info("Background maintenance scheduler started (every 2 minutes)")
     except Exception as e:
-        print(f"Warning: Scheduler initialization failed: {e}")
-    
+        logger.warning("Could not start scheduler: {}", e)
+
     yield
-    
-    # Shutdown
-    print("Shutting down Vehicle Obstruction Resolution API...")
-    
-    # Shutdown scheduler
+
+    logger.info("Shutting down FreeWay Community API...")
     try:
-        scheduler.shutdown()
-        print("Request expiration scheduler stopped")
-    except Exception as e:
-        print(f"Warning: Scheduler shutdown failed: {e}")
+        scheduler.shutdown(wait=False)
+    except Exception:
+        pass
 
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description="Privacy-focused vehicle blocking resolution system",
+    description="Privacy-focused Vehicle Obstruction Resolution Platform",
     lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc"
 )
 
-# Configure CORS
+# CORS Configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -75,21 +94,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API router
+# API V1 Router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
 
 
 @app.get("/")
-async def root():
-    """Root endpoint"""
+def root():
     return {
-        "message": "Vehicle Obstruction Resolution API",
+        "project": settings.PROJECT_NAME,
         "version": settings.VERSION,
-        "status": "running"
+        "status": "online",
+        "docs": "/docs",
+        "apiPrefix": settings.API_V1_PREFIX
     }
-
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy"}

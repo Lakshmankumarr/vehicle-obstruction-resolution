@@ -1,73 +1,70 @@
 """
-Report model for abuse reporting
+Report model for abuse reporting, spam prevention, and dispute tracking.
+Uses GUID and timezone-aware UTC timestamps.
 """
-from sqlalchemy import Column, String, DateTime, ForeignKey, Enum, Index
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
-from datetime import datetime
 import uuid
 import enum
+from sqlalchemy import Column, String, DateTime, ForeignKey, Index
+from sqlalchemy.orm import relationship
 
-from app.core.database import Base
+from app.core.database import Base, GUID
+from app.utils.datetime import now_utc
 
 
-class ReportReason(enum.Enum):
-    """Report reason enumeration"""
+class ReportReason(str, enum.Enum):
     SPAM = "SPAM"
     HARASSMENT = "HARASSMENT"
     FALSE_REQUEST = "FALSE_REQUEST"
+    WRONG_VEHICLE = "WRONG_VEHICLE"
     ABUSE = "ABUSE"
     OTHER = "OTHER"
 
 
-class ReportStatus(enum.Enum):
-    """Report status enumeration"""
+class ReportStatus(str, enum.Enum):
     PENDING = "PENDING"
     UNDER_REVIEW = "UNDER_REVIEW"
-    RESOLVED = "RESOLVED"
+    ACTIONED = "ACTIONED"
     DISMISSED = "DISMISSED"
 
 
-class AdminAction(enum.Enum):
-    """Admin action enumeration"""
+class AdminAction(str, enum.Enum):
     WARNING = "WARNING"
+    STRIKE = "STRIKE"
     TEMPORARY_BAN = "TEMPORARY_BAN"
     PERMANENT_BAN = "PERMANENT_BAN"
     NO_ACTION = "NO_ACTION"
 
 
 class Report(Base):
-    """
-    Report model for abuse reporting
-    Tracks user reports for spam, harassment, and other violations
-    """
+    """User report model."""
     __tablename__ = "reports"
-    
+
     # Primary key
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    
-    # Foreign keys
-    reporterId = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    targetUserId = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4, index=True)
+
+    # Participants
+    reporterId = Column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    targetUserId = Column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    requestId = Column(GUID(), ForeignKey("requests.id", ondelete="SET NULL"), nullable=True, index=True)
+
     # Report details
-    reason = Column(Enum(ReportReason), nullable=False)
+    reason = Column(String(50), default=ReportReason.SPAM.value, nullable=False)
     description = Column(String(1000), nullable=True)
-    
+
     # Status tracking
-    status = Column(Enum(ReportStatus), default=ReportStatus.PENDING, nullable=False, index=True)
-    
-    # Timestamps
-    createdAt = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-    reviewedAt = Column(DateTime, nullable=True)
-    
-    # Admin review
-    reviewedBy = Column(UUID(as_uuid=True), nullable=True)
-    action = Column(Enum(AdminAction), nullable=True)
-    
+    status = Column(String(30), default=ReportStatus.PENDING.value, nullable=False, index=True)
+
+    # Admin actions
+    action = Column(String(30), nullable=True)
+    reviewedBy = Column(GUID(), nullable=True)
+    reviewedAt = Column(DateTime(timezone=True), nullable=True)
+
+    # Timestamps (Timezone-aware UTC)
+    createdAt = Column(DateTime(timezone=True), default=now_utc, nullable=False, index=True)
+
     # Relationships
     reporter = relationship("User", foreign_keys=[reporterId], back_populates="reports_made")
     target_user = relationship("User", foreign_keys=[targetUserId], back_populates="reports_received")
-    
+
     def __repr__(self):
-        return f"<Report(id={self.id}, reason={self.reason}, status={self.status}, reporterId={self.reporterId}, targetUserId={self.targetUserId})>"
+        return f"<Report(id={self.id}, reason={self.reason}, status={self.status})>"

@@ -1,54 +1,41 @@
 """
-DeviceToken model
-Validates: Requirements 22.7, 24.7
+DeviceToken model for mobile/web push notifications (FCM / APNS / Expo).
+Fixes:
+- Section 99 Issue 12: Consolidates push tokens into DeviceToken table
+- Supports multiple devices per user and token lifecycle management
+- Uses timezone-aware UTC timestamps
 """
-from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Enum, Index
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
-from datetime import datetime
 import uuid
-import enum
+from sqlalchemy import Column, String, Boolean, DateTime, ForeignKey, Index
+from sqlalchemy.orm import relationship
 
-from app.core.database import Base
-
-
-class Platform(enum.Enum):
-    """Device platform enumeration"""
-    IOS = "IOS"
-    ANDROID = "ANDROID"
+from app.core.database import Base, GUID
+from app.utils.datetime import now_utc
 
 
 class DeviceToken(Base):
-    """
-    DeviceToken model for FCM token management
-    
-    Validates:
-    - Requirement 22.7: FCM tokens are unique across all device tokens
-    - Requirement 24.7: Index on userId for token retrieval
-    """
+    """Mobile and web push notification device tokens."""
     __tablename__ = "device_tokens"
-    
+
     # Primary key
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
-    
+    id = Column(GUID(), primary_key=True, default=uuid.uuid4, index=True)
+
     # Foreign key to user
-    userId = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    
-    # FCM token
-    fcmToken = Column(String(255), unique=True, nullable=False)
-    
-    # Platform information
-    platform = Column(Enum(Platform), nullable=False)
-    
-    # Status
+    userId = Column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Unique push device token
+    token = Column(String(500), unique=True, nullable=False, index=True)
+    deviceType = Column(String(20), default="ANDROID", nullable=False)  # ANDROID, IOS, WEB
+
+    # Lifecycle status
     isActive = Column(Boolean, default=True, nullable=False)
-    
-    # Timestamps
-    createdAt = Column(DateTime, default=datetime.utcnow, nullable=False)
-    lastUsedAt = Column(DateTime, nullable=True)
-    
-    # Relationships
+
+    # Timestamps (Timezone-aware UTC)
+    createdAt = Column(DateTime(timezone=True), default=now_utc, nullable=False)
+    lastUsedAt = Column(DateTime(timezone=True), nullable=True)
+
+    # Relationship
     user = relationship("User", back_populates="device_tokens")
-    
+
     def __repr__(self):
-        return f"<DeviceToken(id={self.id}, userId={self.userId}, platform={self.platform}, isActive={self.isActive})>"
+        return f"<DeviceToken(id={self.id}, user={self.userId}, type={self.deviceType})>"

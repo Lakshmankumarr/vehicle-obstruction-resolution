@@ -1,38 +1,52 @@
 """
-DateTime utilities for IST (Indian Standard Time)
-All datetime operations should use IST instead of UTC
+Time and timezone utilities for FreeWay Community.
+Fixes:
+- Section 99 Issue 7: UTC and IST mixed in database
+- Section 99 Issue 8: timezone-naive datetime storage
+- Section 99 Issue 9: JWT expiration using ambiguous naive datetime
+- Provides ensure_utc() helper to normalize SQLite/Postgres datetimes
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
+from typing import Optional
 import pytz
 
-# IST timezone
-IST = pytz.timezone('Asia/Kolkata')
+UTC = timezone.utc
+IST = pytz.timezone("Asia/Kolkata")
 
 
-def now_ist() -> datetime:
-    """Get current datetime in IST (naive datetime, no timezone info)"""
-    # Get current time in IST and return as naive datetime
-    return datetime.now(IST).replace(tzinfo=None)
+def now_utc() -> datetime:
+    """Returns the current timezone-aware UTC datetime."""
+    return datetime.now(UTC)
 
 
-def utc_to_ist(utc_dt: datetime) -> datetime:
-    """Convert UTC datetime to IST"""
-    if utc_dt.tzinfo is None:
-        utc_dt = pytz.utc.localize(utc_dt)
-    return utc_dt.astimezone(IST).replace(tzinfo=None)
-
-
-def ist_to_utc(ist_dt: datetime) -> datetime:
-    """Convert IST datetime to UTC"""
-    if ist_dt.tzinfo is None:
-        ist_dt = IST.localize(ist_dt)
-    return ist_dt.astimezone(pytz.utc).replace(tzinfo=None)
-
-
-def format_ist(dt: datetime) -> str:
-    """Format datetime in IST for display"""
+def ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """Ensures datetime is timezone-aware UTC (fixes SQLite naive datetime readback)."""
+    if dt is None:
+        return None
     if dt.tzinfo is None:
-        dt = IST.localize(dt)
-    elif dt.tzinfo != IST:
-        dt = dt.astimezone(IST)
-    return dt.strftime('%d/%m/%Y, %I:%M %p IST')
+        return dt.replace(tzinfo=UTC)
+    return dt.astimezone(UTC)
+
+
+def to_ist(utc_dt: Optional[datetime]) -> Optional[datetime]:
+    """Converts a UTC datetime into IST (Asia/Kolkata)."""
+    if utc_dt is None:
+        return None
+    dt = ensure_utc(utc_dt)
+    return dt.astimezone(IST)
+
+
+def format_ist(utc_dt: Optional[datetime], fmt: str = "%d/%m/%Y, %I:%M %p IST") -> str:
+    """Formats a UTC datetime for human-readable Indian Standard Time display."""
+    if utc_dt is None:
+        return "N/A"
+    ist_dt = to_ist(utc_dt)
+    return ist_dt.strftime(fmt)
+
+
+def to_iso_utc(utc_dt: Optional[datetime]) -> Optional[str]:
+    """Converts a UTC datetime into an ISO 8601 string with 'Z' suffix."""
+    if utc_dt is None:
+        return None
+    dt = ensure_utc(utc_dt)
+    return dt.isoformat().replace("+00:00", "Z")

@@ -1,37 +1,41 @@
 """
-Report schemas for request/response validation
+Report schemas for abuse and dispute reporting.
 """
-from pydantic import BaseModel, Field
 from typing import Optional
+from uuid import UUID
+from datetime import datetime
+from pydantic import BaseModel, Field
+
+from app.models.report import ReportReason, ReportStatus
 
 
 class CreateReportRequest(BaseModel):
-    """Request schema for creating a report"""
-    targetUserId: str = Field(..., description="ID of user being reported")
-    reason: str = Field(..., description="Reason for report (SPAM, HARASSMENT, FALSE_REQUEST, ABUSE, OTHER)")
-    description: Optional[str] = Field(None, max_length=500, description="Optional description")
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "targetUserId": "123e4567-e89b-12d3-a456-426614174000",
-                "reason": "SPAM",
-                "description": "User is sending too many requests"
-            }
-        }
+    """Schema for filing an abuse or false-request report."""
+    targetUserId: UUID = Field(..., description="UUID of user being reported")
+    requestId: Optional[UUID] = Field(None, description="Optional request UUID tied to dispute")
+    reason: ReportReason = Field(default=ReportReason.SPAM, description="SPAM, HARASSMENT, FALSE_REQUEST, WRONG_VEHICLE, ABUSE, OTHER")
+    description: Optional[str] = Field(None, max_length=1000, description="Additional context")
 
 
 class CreateReportResponse(BaseModel):
-    """Response schema for report creation"""
-    success: bool = Field(..., description="Whether report was created successfully")
-    reportId: str = Field(..., description="ID of created report")
-    message: str = Field(..., description="Success message")
-    
+    """Report creation response."""
+    success: bool
+    reportId: UUID
+    status: str
+    message: str
+
+
+class ReportDetailResponse(BaseModel):
+    """Report details for moderation and review."""
+    id: UUID
+    reporterId: UUID
+    targetUserId: UUID
+    requestId: Optional[UUID] = None
+    reason: str
+    description: Optional[str] = None
+    status: str
+    action: Optional[str] = None
+    createdAt: datetime
+
     class Config:
-        json_schema_extra = {
-            "example": {
-                "success": True,
-                "reportId": "123e4567-e89b-12d3-a456-426614174000",
-                "message": "Report submitted successfully. We will review it shortly."
-            }
-        }
+        from_attributes = True
