@@ -19,6 +19,7 @@ class RequestStatus(str, enum.Enum):
     PENDING = "PENDING"
     ACKNOWLEDGED = "ACKNOWLEDGED"
     ON_MY_WAY = "ON_MY_WAY"
+    MOVING = "MOVING"
     CANNOT_MOVE = "CANNOT_MOVE"
     RESOLVED = "RESOLVED"
     EXPIRED = "EXPIRED"
@@ -27,6 +28,7 @@ class RequestStatus(str, enum.Enum):
 
 class ResponseType(str, enum.Enum):
     ON_MY_WAY = "ON_MY_WAY"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
     CANNOT_MOVE = "CANNOT_MOVE"
     MESSAGE = "MESSAGE"
     KEYS_WITH_GUARD = "KEYS_WITH_GUARD"

@@ -1,0 +1,41 @@
+version: '3.8'
+
+# Development override - runs without Nginx/SSL
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.override.yml up
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes:
+      - ./backend:/app
+      - ./backend/logs:/app/logs
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - NOTIFICATION_PROVIDER=mock
+      - ALPR_PROVIDER=mock
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    environment:
+      POSTGRES_DB: freeway_community
+      POSTGRES_USER: freeway
+      POSTGRES_PASSWORD: dev_password
+
+  redis:
+    command: redis-server --appendonly yes
+
+  # Disable nginx and certbot in development
+  nginx:
+    profiles: ["production"]
+  certbot:
+    profiles: ["production"]

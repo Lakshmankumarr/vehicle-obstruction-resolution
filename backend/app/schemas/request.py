@@ -33,7 +33,9 @@ class CreateRequestResponse(BaseModel):
     """Response schema upon request creation."""
     success: bool
     requestId: UUID
+    id: Optional[UUID] = None  # Frontend alias for data.id
     maskedTargetVehicle: str
+    target_vehicle: Optional[str] = None  # Frontend alias
     status: str
     expiresAt: datetime
     message: str
@@ -42,7 +44,7 @@ class CreateRequestResponse(BaseModel):
 class RespondRequestRequest(BaseModel):
     """Schema for blocking vehicle owner's response."""
     requestId: UUID
-    response: ResponseType = Field(..., description="ON_MY_WAY, CANNOT_MOVE, KEYS_WITH_GUARD, MESSAGE")
+    response: str = Field(..., description="ON_MY_WAY, CANNOT_MOVE, KEYS_WITH_GUARD, MESSAGE")
     responseMessage: Optional[str] = Field(None, max_length=500)
     etaMinutes: Optional[int] = Field(None, ge=1, le=120, description="Estimated minutes to move vehicle")
 
@@ -75,10 +77,23 @@ class RequestDetailResponse(BaseModel):
     remainingSeconds: int = 0
     formattedCreatedIST: Optional[str] = None
 
+    # Frontend aliases (snake_case)
+    requester_id: Optional[UUID] = None
+    target_user_id: Optional[UUID] = None
+    target_vehicle: Optional[str] = None
+    masked_target_vehicle: Optional[str] = None
+    requester_vehicle: Optional[str] = None
+    response_message: Optional[str] = None
+    eta_minutes: Optional[int] = None
+    created_at: Optional[datetime] = None
+    is_emergency: Optional[bool] = False
+    direction: Optional[str] = None
+
 
 class RequestHistoryResponse(BaseModel):
     """List of sent/received requests."""
     success: bool
     sent: List[RequestDetailResponse]
     received: List[RequestDetailResponse]
+    requests: Optional[List[RequestDetailResponse]] = None  # Combined list for frontend
     total: int

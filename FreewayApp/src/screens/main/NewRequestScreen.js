@@ -66,7 +66,7 @@ export default function NewRequestScreen({ navigation }) {
       Alert.alert(
         isEmergency ? '⚡ Emergency Sent!' : '✅ Notification Sent!',
         'The vehicle owner has been anonymously notified. You will be updated when they respond.',
-        [{ text: 'Track Status', onPress: () => navigation.replace('RequestDetail', { requestId: data.id, request: data }) }],
+        [{ text: 'Track Status', onPress: () => navigation.replace('RequestDetail', { requestId: data.id || data.requestId, request: data }) }],
       );
     } catch (err) {
       Alert.alert('Failed to Send', err.message || 'Could not send notification.');
@@ -111,7 +111,7 @@ export default function NewRequestScreen({ navigation }) {
           {identified && (
             <View style={styles.identifiedBox}>
               <Text style={styles.identifiedLabel}>✅ Vehicle found on FreeWay</Text>
-              <PlateDisplay plate={identified.masked_number} size="md" style={styles.identifiedPlate} />
+              <PlateDisplay plate={identified.maskedVehicleNumber || identified.masked_number || identified.targetVehiclePlate} size="md" style={styles.identifiedPlate} />
             </View>
           )}
 

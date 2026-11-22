@@ -100,7 +100,9 @@ def identify_vehicle(
     return VehicleIdentifyResponse(
         success=True,
         maskedVehicleNumber=masked,
+        masked_number=masked,
         targetVehiclePlate=plate_to_check,
+        target_vehicle=plate_to_check,
         isRegistered=is_reg,
         canSendRequest=can_send,
         confidence=conf,

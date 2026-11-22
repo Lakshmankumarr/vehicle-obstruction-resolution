@@ -24,14 +24,14 @@ function VehicleCard({ vehicle, onDelete }) {
     <Card style={styles.vehicleCard}>
       <View style={styles.vehicleRow}>
         <Text style={styles.vehicleEmoji}>
-          {VEHICLE_EMOJIS[vehicle.vehicle_type] || '🚗'}
+          {VEHICLE_EMOJIS[vehicle.vehicle_type || vehicle.vehicleType] || '🚗'}
         </Text>
         <View style={styles.vehicleInfo}>
-          <PlateDisplay plate={vehicle.vehicle_number} size="sm" />
+          <PlateDisplay plate={vehicle.vehicle_number || vehicle.vehicleNumber} size="sm" />
           {vehicle.nickname && (
             <Text style={styles.nickname}>{vehicle.nickname}</Text>
           )}
-          <Text style={styles.vehicleType}>{vehicle.vehicle_type}</Text>
+          <Text style={styles.vehicleType}>{vehicle.vehicle_type || vehicle.vehicleType}</Text>
         </View>
         <TouchableOpacity
           style={styles.deleteBtn}
@@ -57,7 +57,7 @@ export default function VehiclesScreen() {
   const load = useCallback(async () => {
     try {
       const data = await api.listVehicles();
-      setVehicles(data.vehicles || []);
+      const list = Array.isArray(data) ? data : (data?.vehicles || []); setVehicles(list);
     } catch (err) {
       console.warn('Vehicles load error:', err);
     }

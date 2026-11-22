@@ -4,6 +4,8 @@ Authentication API endpoints: registration, login, token refresh, and profile re
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
+import re
 from loguru import logger
 
 from app.core.config import settings
@@ -113,13 +115,19 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
     user_prof = UserProfileResponse(
         id=user.id,
         phoneNumber=user.phoneNumber,
+        phone_number=user.phoneNumber,
         name=user.name,
         isFlagged=user.isFlagged,
         strikeCount=user.strikeCount,
         reputationScore=user.reputationScore,
+        reputation_score=user.reputationScore,
         createdAt=user.createdAt,
+        created_at=user.createdAt,
         primaryVehicle=norm_plate,
-        vehicleCount=1
+        vehicle_number=norm_plate,
+        vehicleCount=1,
+        total_requests=0,
+        resolved_requests=0
     )
 
     return AuthResponse(
@@ -154,8 +162,18 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     if veh:
         user = db.query(User).filter(User.id == veh.userId).first()
     else:
-        # Try finding by phone
+        # Try finding by phone (exact, stripped digits, or +91 prefix)
         user = db.query(User).filter(User.phoneNumber == identifier).first()
+        if not user:
+            digits = re.sub(r"\D", "", identifier)
+            if digits:
+                user = db.query(User).filter(
+                    or_(
+                        User.phoneNumber == digits,
+                        User.phoneNumber == f"+91{digits}",
+                        User.phoneNumber.endswith(digits[-10:]) if len(digits) >= 10 else False
+                    )
+                ).first()
         if user and user.vehicles:
             primary_veh = next((v for v in user.vehicles if v.isPrimary), user.vehicles[0])
             primary_plate = primary_veh.vehicleNumber
@@ -198,16 +216,29 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
     access_tok = create_access_token(token_data)
     refresh_tok = create_refresh_token(token_data)
 
+    from app.models.request import Request, RequestStatus
+    total_reqs = db.query(Request).filter(or_(Request.requesterId == user.id, Request.targetUserId == user.id)).count()
+    resolved_reqs = db.query(Request).filter(
+        or_(Request.requesterId == user.id, Request.targetUserId == user.id),
+        Request.status == RequestStatus.RESOLVED.value
+    ).count()
+
     user_prof = UserProfileResponse(
         id=user.id,
         phoneNumber=user.phoneNumber,
+        phone_number=user.phoneNumber,
         name=user.name,
         isFlagged=user.isFlagged,
         strikeCount=user.strikeCount,
         reputationScore=user.reputationScore,
+        reputation_score=user.reputationScore,
         createdAt=user.createdAt,
+        created_at=user.createdAt,
         primaryVehicle=primary_plate,
-        vehicleCount=len(user.vehicles)
+        vehicle_number=primary_plate,
+        vehicleCount=len(user.vehicles),
+        total_requests=total_reqs,
+        resolved_requests=resolved_reqs
     )
 
     return AuthResponse(
@@ -252,21 +283,34 @@ def refresh_token(req: RefreshTokenRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserProfileResponse)
-def get_profile(current_user: User = Depends(get_current_user)):
+def get_profile(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Returns current authenticated user details."""
     primary_plate = None
     if current_user.vehicles:
         prim = next((v for v in current_user.vehicles if v.isPrimary), current_user.vehicles[0])
         primary_plate = prim.vehicleNumber
 
+    from app.models.request import Request, RequestStatus
+    total_reqs = db.query(Request).filter(or_(Request.requesterId == current_user.id, Request.targetUserId == current_user.id)).count()
+    resolved_reqs = db.query(Request).filter(
+        or_(Request.requesterId == current_user.id, Request.targetUserId == current_user.id),
+        Request.status == RequestStatus.RESOLVED.value
+    ).count()
+
     return UserProfileResponse(
         id=current_user.id,
         phoneNumber=current_user.phoneNumber,
+        phone_number=current_user.phoneNumber,
         name=current_user.name,
         isFlagged=current_user.isFlagged,
         strikeCount=current_user.strikeCount,
         reputationScore=current_user.reputationScore,
+        reputation_score=current_user.reputationScore,
         createdAt=current_user.createdAt,
+        created_at=current_user.createdAt,
         primaryVehicle=primary_plate,
-        vehicleCount=len(current_user.vehicles)
+        vehicle_number=primary_plate,
+        vehicleCount=len(current_user.vehicles),
+        total_requests=total_reqs,
+        resolved_requests=resolved_reqs
     )

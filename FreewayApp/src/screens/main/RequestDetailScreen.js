@@ -58,7 +58,7 @@ export default function RequestDetailScreen({ route, navigation }) {
     setRefreshing(false);
   };
 
-  const isRequester = user?.id === request?.requester_id;
+  const isRequester = (user?.id === (request?.requesterId || request?.requester_id)) || Boolean(request?.isRequester);
   const isBlocked = ACTIVE_STATUSES.includes(request?.status);
 
   // --- Actions ---
@@ -108,7 +108,7 @@ export default function RequestDetailScreen({ route, navigation }) {
   };
 
   const handleReport = () =>
-    navigation.navigate('ReportUser', { targetUserId: request.target_user_id, requestId });
+    navigation.navigate('ReportUser', { targetUserId: (request.targetUserId || request.target_user_id), requestId });
 
   if (!request) {
     return (
@@ -147,7 +147,7 @@ export default function RequestDetailScreen({ route, navigation }) {
               {isRequester ? 'Blocking Vehicle' : 'Requester'}
             </Text>
             <PlateDisplay
-              plate={isRequester ? request.target_vehicle : request.requester_vehicle}
+              plate={isRequester ? (request.maskedTargetVehicle || request.target_vehicle) : (request.requester_vehicle || request.maskedTargetVehicle || 'Vehicle')}
               size="md"
             />
           </View>
@@ -160,7 +160,7 @@ export default function RequestDetailScreen({ route, navigation }) {
         )}
 
         <Text style={styles.timestamp}>
-          Sent {new Date(request.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+          Sent {request.formattedCreatedIST || (request.createdAt || request.created_at ? new Date(request.createdAt || request.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : '')}
         </Text>
       </Card>
 
@@ -169,11 +169,11 @@ export default function RequestDetailScreen({ route, navigation }) {
         <Card style={styles.responseCard}>
           <Text style={styles.responseTitle}>Response</Text>
           <Text style={styles.responseValue}>{request.response}</Text>
-          {request.response_message && (
-            <Text style={styles.responseMsg}>"{request.response_message}"</Text>
+          {(request.responseMessage || request.response_message) && (
+            <Text style={styles.responseMsg}>"{(request.responseMessage || request.response_message)}"</Text>
           )}
-          {request.eta_minutes && (
-            <Text style={styles.eta}>ETA: {request.eta_minutes} minutes</Text>
+          {(request.etaMinutes || request.eta_minutes) && (
+            <Text style={styles.eta}>ETA: {(request.etaMinutes || request.eta_minutes)} minutes</Text>
           )}
         </Card>
       )}

@@ -64,6 +64,14 @@ class UserProfileResponse(BaseModel):
     primaryVehicle: Optional[str] = None
     vehicleCount: int = 0
 
+    # Frontend aliases (snake_case)
+    phone_number: Optional[str] = None
+    vehicle_number: Optional[str] = None
+    created_at: Optional[datetime] = None
+    reputation_score: Optional[float] = None
+    total_requests: Optional[int] = 0
+    resolved_requests: Optional[int] = 0
+
     class Config:
         from_attributes = True
 

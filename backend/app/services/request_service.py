@@ -152,7 +152,9 @@ class RequestService:
         return {
             "success": True,
             "requestId": req_record.id,
+            "id": req_record.id,
             "maskedTargetVehicle": masked_plate,
+            "target_vehicle": masked_plate,
             "status": req_record.status,
             "expiresAt": req_record.expiresAt,
             "message": "Vehicle owner notified successfully."
@@ -182,12 +184,13 @@ class RequestService:
             )
 
         now = now_utc()
-        req.response = response_type.value
         req.responseMessage = response_message
         req.etaMinutes = eta_minutes
         req.respondedAt = now
+        resp_val = response_type.value if hasattr(response_type, "value") else str(response_type)
+        req.response = resp_val
         req.status = (
-            RequestStatus.ON_MY_WAY.value if response_type == ResponseType.ON_MY_WAY
+            RequestStatus.ON_MY_WAY.value if resp_val in ["ON_MY_WAY", "MOVING"]
             else RequestStatus.ACKNOWLEDGED.value
         )
 
@@ -267,11 +270,21 @@ class RequestService:
 
         rem_secs = max(int((exp_utc - now).total_seconds()), 0) if exp_utc else 0
 
+        masked_plate = mask_vehicle_number(req.targetVehicle)
+        is_req = (req.requesterId == user.id)
+        is_tgt = (req.targetUserId == user.id)
+        # Find requester's primary vehicle for receiver display
+        req_vehicle_str = None
+        requester_user = db.query(User).filter(User.id == req.requesterId).first()
+        if requester_user and requester_user.vehicles:
+            prim_veh = next((v for v in requester_user.vehicles if v.isPrimary), requester_user.vehicles[0])
+            req_vehicle_str = mask_vehicle_number(prim_veh.vehicleNumber)
+
         return {
             "id": req.id,
             "requesterId": req.requesterId,
             "targetUserId": req.targetUserId,
-            "maskedTargetVehicle": mask_vehicle_number(req.targetVehicle),
+            "maskedTargetVehicle": masked_plate,
             "status": req.status,
             "message": req.message,
             "response": req.response,
@@ -281,10 +294,20 @@ class RequestService:
             "expiresAt": req.expiresAt,
             "respondedAt": req.respondedAt,
             "resolvedAt": req.resolvedAt,
-            "isRequester": (req.requesterId == user.id),
-            "isTarget": (req.targetUserId == user.id),
+            "isRequester": is_req,
+            "isTarget": is_tgt,
             "remainingSeconds": rem_secs,
-            "formattedCreatedIST": format_ist(req.createdAt)
+            "formattedCreatedIST": format_ist(req.createdAt),
+            # Frontend aliases
+            "requester_id": req.requesterId,
+            "target_user_id": req.targetUserId,
+            "target_vehicle": masked_plate,
+            "masked_target_vehicle": masked_plate,
+            "requester_vehicle": req_vehicle_str or "Vehicle",
+            "response_message": req.responseMessage,
+            "eta_minutes": req.etaMinutes,
+            "created_at": req.createdAt,
+            "direction": "outgoing" if is_req else "incoming"
         }
 
     def get_user_history(self, db: Session, user: User) -> Dict[str, Any]:
@@ -299,11 +322,12 @@ class RequestService:
             if r.status == RequestStatus.PENDING.value and exp_utc and now > exp_utc:
                 r.status = RequestStatus.EXPIRED.value
             rem = max(int((exp_utc - now).total_seconds()), 0) if exp_utc else 0
-            sent_list.append({
+            masked_plate = mask_vehicle_number(r.targetVehicle)
+            item = {
                 "id": r.id,
                 "requesterId": r.requesterId,
                 "targetUserId": r.targetUserId,
-                "maskedTargetVehicle": mask_vehicle_number(r.targetVehicle),
+                "maskedTargetVehicle": masked_plate,
                 "status": r.status,
                 "message": r.message,
                 "response": r.response,
@@ -316,8 +340,18 @@ class RequestService:
                 "isRequester": True,
                 "isTarget": False,
                 "remainingSeconds": rem,
-                "formattedCreatedIST": format_ist(r.createdAt)
-            })
+                "formattedCreatedIST": format_ist(r.createdAt),
+                # Frontend aliases
+                "requester_id": r.requesterId,
+                "target_user_id": r.targetUserId,
+                "target_vehicle": masked_plate,
+                "masked_target_vehicle": masked_plate,
+                "response_message": r.responseMessage,
+                "eta_minutes": r.etaMinutes,
+                "created_at": r.createdAt,
+                "direction": "outgoing"
+            }
+            sent_list.append(item)
 
         recv_list = []
         for r in recv_recs:
@@ -325,11 +359,12 @@ class RequestService:
             if r.status == RequestStatus.PENDING.value and exp_utc and now > exp_utc:
                 r.status = RequestStatus.EXPIRED.value
             rem = max(int((exp_utc - now).total_seconds()), 0) if exp_utc else 0
-            recv_list.append({
+            masked_plate = mask_vehicle_number(r.targetVehicle)
+            item = {
                 "id": r.id,
                 "requesterId": r.requesterId,
                 "targetUserId": r.targetUserId,
-                "maskedTargetVehicle": mask_vehicle_number(r.targetVehicle),
+                "maskedTargetVehicle": masked_plate,
                 "status": r.status,
                 "message": r.message,
                 "response": r.response,
@@ -342,15 +377,31 @@ class RequestService:
                 "isRequester": False,
                 "isTarget": True,
                 "remainingSeconds": rem,
-                "formattedCreatedIST": format_ist(r.createdAt)
-            })
+                "formattedCreatedIST": format_ist(r.createdAt),
+                # Frontend aliases
+                "requester_id": r.requesterId,
+                "target_user_id": r.targetUserId,
+                "target_vehicle": masked_plate,
+                "masked_target_vehicle": masked_plate,
+                "response_message": r.responseMessage,
+                "eta_minutes": r.etaMinutes,
+                "created_at": r.createdAt,
+                "direction": "incoming"
+            }
+            recv_list.append(item)
 
         db.commit()
+        combined = sorted(
+            sent_list + recv_list,
+            key=lambda x: x["createdAt"],
+            reverse=True
+        )
         return {
             "success": True,
             "sent": sent_list,
             "received": recv_list,
-            "total": len(sent_list) + len(recv_list)
+            "requests": combined,
+            "total": len(combined)
         }
 
 

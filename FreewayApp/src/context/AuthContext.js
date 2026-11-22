@@ -106,18 +106,38 @@ export function AuthProvider({ children }) {
 
     await saveTokens(data);
 
-    const meResponse = await api.getMe();
-    const me = meResponse?.user || meResponse;
+    let me = data?.user;
+    if (!me) {
+      try {
+        const meResponse = await api.getMe();
+        me = meResponse?.user || meResponse;
+      } catch (e) {
+        console.warn("Fallback getMe error:", e);
+      }
+    }
 
     if (!me) {
       throw new Error("Login succeeded but user information was not returned.");
     }
 
-    setUser(me);
-    await AsyncStorage.setItem(USER_KEY, JSON.stringify(me));
+    // Ensure both camelCase and snake_case properties are present
+    const normalizedUser = {
+      ...me,
+      vehicle_number: me.vehicle_number || me.primaryVehicle || me.vehicleNumber,
+      primaryVehicle: me.primaryVehicle || me.vehicle_number || me.vehicleNumber,
+      phone_number: me.phone_number || me.phoneNumber,
+      phoneNumber: me.phoneNumber || me.phone_number,
+      created_at: me.created_at || me.createdAt,
+      createdAt: me.createdAt || me.created_at,
+      reputation_score: me.reputation_score !== undefined ? me.reputation_score : me.reputationScore,
+      reputationScore: me.reputationScore !== undefined ? me.reputationScore : me.reputation_score,
+    };
+
+    setUser(normalizedUser);
+    await AsyncStorage.setItem(USER_KEY, JSON.stringify(normalizedUser));
     setIsAuthenticated(true);
 
-    return me;
+    return normalizedUser;
   }, []);
 
   const register = useCallback(

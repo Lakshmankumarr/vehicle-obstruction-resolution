@@ -25,7 +25,17 @@ export default function HistoryScreen({ navigation }) {
   const load = useCallback(async () => {
     try {
       const data = await api.getHistory();
-      setHistory(data.requests || []);
+      let allRequests = [];
+      if (Array.isArray(data.requests)) {
+        allRequests = data.requests;
+      } else if (Array.isArray(data.sent) || Array.isArray(data.received)) {
+        const sent = (data.sent || []).map((r) => ({ ...r, direction: 'outgoing' }));
+        const received = (data.received || []).map((r) => ({ ...r, direction: 'incoming' }));
+        allRequests = [...received, ...sent].sort(
+          (a, b) => new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0)
+        );
+      }
+      setHistory(allRequests);
     } catch (err) {
       console.warn('History load error:', err);
     }
@@ -66,7 +76,7 @@ export default function HistoryScreen({ navigation }) {
         </View>
 
         <PlateDisplay
-          plate={r.direction === 'incoming' ? r.requester_vehicle : r.target_vehicle}
+          plate={r.maskedTargetVehicle || r.target_vehicle || r.requester_vehicle || 'Vehicle'}
           size="sm"
           style={styles.plate}
         />
@@ -78,11 +88,11 @@ export default function HistoryScreen({ navigation }) {
         )}
 
         <Text style={styles.time}>
-          {new Date(r.created_at).toLocaleString('en-IN', {
+          {r.formattedCreatedIST || (r.createdAt || r.created_at ? new Date(r.createdAt || r.created_at).toLocaleString('en-IN', {
             timeZone: 'Asia/Kolkata',
             dateStyle: 'medium',
             timeStyle: 'short',
-          })}
+          }) : '')}
         </Text>
       </Card>
     </TouchableOpacity>

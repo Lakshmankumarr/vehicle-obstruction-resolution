@@ -40,6 +40,12 @@ class VehicleResponse(BaseModel):
     isActive: bool
     registeredAt: datetime
 
+    # Frontend aliases
+    vehicle_number: Optional[str] = None
+    masked_number: Optional[str] = None
+    vehicle_type: Optional[str] = None
+    is_primary: Optional[bool] = None
+
     class Config:
         from_attributes = True
 
@@ -57,7 +63,9 @@ class VehicleIdentifyResponse(BaseModel):
     """
     success: bool
     maskedVehicleNumber: str
+    masked_number: Optional[str] = None  # Frontend alias
     targetVehiclePlate: str  # Normalized plate for backend request initiation
+    target_vehicle: Optional[str] = None  # Frontend alias
     isRegistered: bool
     canSendRequest: bool
     confidence: Optional[float] = None

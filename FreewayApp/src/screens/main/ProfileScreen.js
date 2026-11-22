@@ -7,6 +7,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { api } from '../../api/client';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { colors, spacing, radius } from '../../theme';
@@ -38,6 +39,76 @@ export default function ProfileScreen({ navigation }) {
     ]);
   };
 
+  const handleExportData = async () => {
+    Alert.alert('Export Data', 'Preparing your data export...', [{ text: 'OK' }]);
+    try {
+      const data = await api.exportUserData();
+      Alert.alert(
+        'Export Ready',
+        'Your data has been exported. In a production app, this would be saved as a JSON file.',
+        [{ text: 'OK' }]
+      );
+      console.log('GDPR Export:', JSON.stringify(data, null, 2));
+    } catch (err) {
+      Alert.alert('Export Failed', err.message || 'Could not export data.');
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      '⚠️ Delete Account Permanently?',
+      'This will permanently delete your account and ALL associated data:\n\n• Your vehicles\n• Request history (sent & received)\n• Reports made & received\n• Device tokens\n• Audit logs (anonymized)\n\nThis action CANNOT be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Forever',
+          style: 'destructive',
+          onPress: async () => {
+            Alert.alert(
+              'FINAL CONFIRMATION',
+              'Type "DELETE" to confirm permanent account deletion.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'I Understand',
+                  onPress: async () => {
+                    try {
+                      await api.deleteAccount();
+                      Alert.alert('Account Deleted', 'Your account has been permanently deleted.', [
+                        { text: 'OK', onPress: logout }
+                      ]);
+                    } catch (err) {
+                      Alert.alert('Deletion Failed', err.message || 'Could not delete account.');
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
+
+  const handleViewPrivacyPolicy = async () => {
+    try {
+      const data = await api.getPrivacyPolicy();
+      const policy = data.policy;
+      Alert.alert(
+        'Privacy Policy v' + data.version,
+        `Data Controller: ${policy.data_controller}\n\n` +
+        `Data Collected:\n${policy.data_collected.join(', ')}\n\n` +
+        `Purposes:\n${policy.purposes.join(', ')}\n\n` +
+        `Retention: ${policy.retention.account_data}\n\n` +
+        `Your Rights:\n${policy.user_rights.join('\n')}\n\n` +
+        `Contact: ${policy.dpo_contact}`,
+        [{ text: 'Close' }]
+      );
+    } catch (err) {
+      Alert.alert('Error', 'Could not load privacy policy.');
+    }
+  };
+
   const memberSince = user?.created_at
     ? new Date(user.created_at).toLocaleDateString('en-IN', {
         month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata',
@@ -57,7 +128,7 @@ export default function ProfileScreen({ navigation }) {
           <View style={styles.avatarBadge} />
         </View>
         <Text style={styles.name}>{user?.name || 'Driver'}</Text>
-        <Text style={styles.vehicleNum}>{user?.vehicle_number || '—'}</Text>
+        <Text style={styles.vehicleNum}>{user?.vehicle_number || user?.primaryVehicle || '—'}</Text>
         <Text style={styles.since}>Member since {memberSince}</Text>
       </View>
 
@@ -74,8 +145,8 @@ export default function ProfileScreen({ navigation }) {
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statBox}>
-          <Text style={[styles.statNum, { color: user?.reputation_score >= 4 ? colors.success : colors.warning }]}>
-            {user?.reputation_score?.toFixed(1) ?? '—'}
+          <Text style={[styles.statNum, { color: (user?.reputation_score !== undefined ? user.reputation_score : user?.reputationScore) >= 4 ? colors.success : colors.warning }]}>
+            {(user?.reputation_score !== undefined ? user.reputation_score : user?.reputationScore)?.toFixed(1) ?? '—'}
           </Text>
           <Text style={styles.statLabel}>Rep Score</Text>
         </View>
@@ -95,7 +166,7 @@ export default function ProfileScreen({ navigation }) {
         <SettingRow
           icon="📱"
           title="Phone Number"
-          subtitle={user?.phone_number ? `+91 ${user.phone_number}` : 'Not set'}
+          subtitle={(user?.phone_number || user?.phoneNumber) ? `+91 ${user.phone_number}` : 'Not set'}
           style={styles.cardRow}
         />
         <View style={styles.divider} />
@@ -148,8 +219,8 @@ export default function ProfileScreen({ navigation }) {
         <SettingRow
           icon="🛡️"
           title="Privacy Policy"
-          subtitle="How we protect your identity"
-          onPress={() => Alert.alert('Privacy', 'Your vehicle number is always masked.\nWe never share personal data without consent.')}
+          subtitle="View our privacy policy"
+          onPress={handleViewPrivacyPolicy}
           style={styles.cardRow}
         />
         <View style={styles.divider} />
@@ -158,6 +229,22 @@ export default function ProfileScreen({ navigation }) {
           title="Terms of Service"
           onPress={() => Alert.alert('Terms', 'FreeWay Community is for legitimate obstruction resolution only.')}
           style={styles.cardRow}
+        />
+        <View style={styles.divider} />
+        <SettingRow
+          icon="📤"
+          title="Export My Data"
+          subtitle="Download all your data (GDPR Article 15)"
+          onPress={handleExportData}
+          style={styles.cardRow}
+        />
+        <View style={styles.divider} />
+        <SettingRow
+          icon="🗑️"
+          title="Delete Account"
+          subtitle="Permanently delete your account (GDPR Article 17)"
+          onPress={handleDeleteAccount}
+          style={{ ...styles.cardRow, opacity: 0.8 }}
         />
         <View style={styles.divider} />
         <SettingRow

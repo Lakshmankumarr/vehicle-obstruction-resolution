@@ -18,7 +18,21 @@ import { EmptyState } from '../../components/EmptyState';
 import { colors, spacing, radius } from '../../theme';
 
 function RequestCard({ req, onPress }) {
-  const isIncoming = req.direction === 'incoming';
+  const isIncoming = req.direction === 'incoming' || req.isTarget;
+  const plateText =
+    req.maskedTargetVehicle ||
+    req.target_vehicle ||
+    req.masked_target_vehicle ||
+    req.targetVehicle ||
+    req.requester_vehicle ||
+    'Vehicle';
+  const dateVal = req.createdAt || req.created_at;
+  const timeText = req.formattedCreatedIST || (dateVal ? new Date(dateVal).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }) : '');
+
   return (
     <TouchableOpacity onPress={() => onPress(req)} activeOpacity={0.85}>
       <Card style={styles.reqCard}>
@@ -33,7 +47,7 @@ function RequestCard({ req, onPress }) {
         </View>
 
         <PlateDisplay
-          plate={req.target_vehicle || req.requester_vehicle}
+          plate={plateText}
           size="sm"
           style={styles.plate}
         />
@@ -44,13 +58,7 @@ function RequestCard({ req, onPress }) {
           </Text>
         )}
 
-        <Text style={styles.reqTime}>
-          {new Date(req.created_at).toLocaleString('en-IN', {
-            timeZone: 'Asia/Kolkata',
-            dateStyle: 'medium',
-            timeStyle: 'short',
-          })}
-        </Text>
+        {timeText ? <Text style={styles.reqTime}>{timeText}</Text> : null}
       </Card>
     </TouchableOpacity>
   );
@@ -65,7 +73,17 @@ export default function DashboardScreen({ navigation }) {
   const load = useCallback(async () => {
     try {
       const data = await api.getHistory();
-      setHistory(data.requests || []);
+      let allRequests = [];
+      if (Array.isArray(data.requests)) {
+        allRequests = data.requests;
+      } else if (Array.isArray(data.sent) || Array.isArray(data.received)) {
+        const sent = (data.sent || []).map((r) => ({ ...r, direction: 'outgoing' }));
+        const received = (data.received || []).map((r) => ({ ...r, direction: 'incoming' }));
+        allRequests = [...received, ...sent].sort(
+          (a, b) => new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0)
+        );
+      }
+      setHistory(allRequests);
     } catch (err) {
       console.warn('Dashboard load error:', err);
     }

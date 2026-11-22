@@ -12,6 +12,7 @@ from app.api.v1.endpoints import (
     report,
     admin,
     health,
+    gdpr,
 )
 
 api_router = APIRouter()
@@ -24,3 +25,4 @@ api_router.include_router(notification.router, prefix="/notification", tags=["Pu
 api_router.include_router(report.router, prefix="/report", tags=["Abuse & Reports"])
 api_router.include_router(admin.router, prefix="/admin", tags=["Admin & Moderation"])
 api_router.include_router(health.router, tags=["Health"])
+api_router.include_router(gdpr.router, prefix="/gdpr", tags=["GDPR Compliance"])

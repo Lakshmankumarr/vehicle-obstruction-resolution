@@ -152,6 +152,19 @@ class ApiClient {
   async getHealth() {
     return this.request("/health", { method: "GET" });
   }
+
+  // --- GDPR Compliance ---
+  async exportUserData() {
+    return this.request("/gdpr/export", { method: "GET" });
+  }
+
+  async deleteAccount() {
+    return this.request("/gdpr/account", { method: "DELETE" });
+  }
+
+  async getPrivacyPolicy() {
+    return this.request("/gdpr/privacy-policy", { method: "GET" });
+  }
 }
 
 export const api = new ApiClient();

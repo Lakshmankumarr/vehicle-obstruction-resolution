@@ -17,6 +17,7 @@ class ReportReason(str, enum.Enum):
     FALSE_REQUEST = "FALSE_REQUEST"
     WRONG_VEHICLE = "WRONG_VEHICLE"
     ABUSE = "ABUSE"
+    IMPERSONATION = "IMPERSONATION"
     OTHER = "OTHER"
 
 
