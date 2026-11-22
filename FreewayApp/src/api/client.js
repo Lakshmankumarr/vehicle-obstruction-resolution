@@ -1,4 +1,4 @@
-﻿/**
+/**
  * FreeWay Community API Client.
  * Connects React Native app to the FastAPI backend.
  * Configured for LAN access (192.168.29.87:8000) so physical mobile devices
@@ -6,7 +6,7 @@
  */
 import { Platform } from "react-native";
 
-export const LAN_HOST = "http://192.168.29.87:8000";
+export const LAN_HOST = process.env.EXPO_PUBLIC_API_URL || "http://192.168.29.87:8000";
 export const EMULATOR_HOST = "http://10.0.2.2:8000";
 export const LOCAL_HOST = "http://localhost:8000";
 

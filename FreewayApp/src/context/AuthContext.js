@@ -1,25 +1,29 @@
 /**
  * FreeWay Community — AuthContext
  * Global authentication state: login, logout, token management,
- * and SecureStore persistence for tokens across app restarts.
+ * and AsyncStorage persistence for tokens across app restarts.
  */
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Alert } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '../api/client';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { api } from "../api/client";
 
 const AuthContext = createContext(null);
 
-const TOKEN_KEY = '@freeway:access_token';
-const REFRESH_KEY = '@freeway:refresh_token';
-const USER_KEY = '@freeway:user';
+const TOKEN_KEY = "@freeway:access_token";
+const REFRESH_KEY = "@freeway:refresh_token";
+const USER_KEY = "@freeway:user";
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Restore session on app boot
   useEffect(() => {
     restoreSession();
   }, []);
@@ -32,71 +36,162 @@ export function AuthProvider({ children }) {
 
       if (token) {
         api.setToken(token, refresh);
+
         if (cachedUser) {
-          setUser(JSON.parse(cachedUser));
-          setIsAuthenticated(true);
+          try {
+            setUser(JSON.parse(cachedUser));
+            setIsAuthenticated(true);
+          } catch {
+            await AsyncStorage.removeItem(USER_KEY);
+          }
         }
-        // Validate token with server
+
         try {
-          const me = await api.getMe();
-          setUser(me);
-          await AsyncStorage.setItem(USER_KEY, JSON.stringify(me));
-          setIsAuthenticated(true);
+          const meResponse = await api.getMe();
+
+          // Support both direct user response and { user: ... } response
+          const me = meResponse?.user || meResponse;
+
+          if (me) {
+            setUser(me);
+            await AsyncStorage.setItem(USER_KEY, JSON.stringify(me));
+            setIsAuthenticated(true);
+          }
         } catch {
-          // Token expired — clear session
           await clearSession();
         }
       }
     } catch (err) {
-      console.warn('Session restore error:', err);
+      console.warn("Session restore error:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const saveTokens = async (data) => {
+    const accessToken =
+      data?.tokens?.accessToken ||
+      data?.tokens?.access_token ||
+      data?.accessToken ||
+      data?.access_token;
+
+    const refreshToken =
+      data?.tokens?.refreshToken ||
+      data?.tokens?.refresh_token ||
+      data?.refreshToken ||
+      data?.refresh_token;
+
+    if (!accessToken) {
+      throw new Error("Authentication succeeded but no access token was returned.");
+    }
+
+    api.setToken(accessToken, refreshToken || null);
+
+    await AsyncStorage.setItem(TOKEN_KEY, accessToken);
+
+    if (refreshToken) {
+      await AsyncStorage.setItem(REFRESH_KEY, refreshToken);
+    } else {
+      await AsyncStorage.removeItem(REFRESH_KEY);
+    }
+
+    return {
+      accessToken,
+      refreshToken: refreshToken || null,
+    };
+  };
+
   const login = useCallback(async (vehicleNumber, password) => {
     const data = await api.login(vehicleNumber, password);
-    api.setToken(data.access_token, data.refresh_token);
-    await AsyncStorage.setItem(TOKEN_KEY, data.access_token);
-    if (data.refresh_token) {
-      await AsyncStorage.setItem(REFRESH_KEY, data.refresh_token);
+
+    await saveTokens(data);
+
+    const meResponse = await api.getMe();
+    const me = meResponse?.user || meResponse;
+
+    if (!me) {
+      throw new Error("Login succeeded but user information was not returned.");
     }
-    const me = await api.getMe();
+
     setUser(me);
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(me));
     setIsAuthenticated(true);
+
     return me;
   }, []);
 
-  const register = useCallback(async (vehicleNumber, password, phoneNumber, name) => {
-    const data = await api.register(vehicleNumber, password, phoneNumber, name);
-    return data;
-  }, []);
+  const register = useCallback(
+    async (vehicleNumber, password, phoneNumber, name) => {
+      const data = await api.register(
+        vehicleNumber,
+        password,
+        phoneNumber,
+        name
+      );
+
+      // Registration returns authentication tokens.
+      // Save them immediately so the user is logged in after registration.
+      await saveTokens(data);
+
+      const meResponse = data?.user
+        ? { user: data.user }
+        : await api.getMe();
+
+      const me = meResponse?.user || meResponse;
+
+      if (me) {
+        setUser(me);
+        await AsyncStorage.setItem(USER_KEY, JSON.stringify(me));
+        setIsAuthenticated(true);
+      }
+
+      return me || data;
+    },
+    []
+  );
+
+  const clearSession = async () => {
+    api.clearToken();
+
+    await AsyncStorage.multiRemove([
+      TOKEN_KEY,
+      REFRESH_KEY,
+      USER_KEY,
+    ]);
+
+    setUser(null);
+    setIsAuthenticated(false);
+  };
 
   const logout = useCallback(async () => {
     await clearSession();
   }, []);
 
-  const clearSession = async () => {
-    api.clearToken();
-    await AsyncStorage.multiRemove([TOKEN_KEY, REFRESH_KEY, USER_KEY]);
-    setUser(null);
-    setIsAuthenticated(false);
-  };
-
   const refreshUser = useCallback(async () => {
     try {
-      const me = await api.getMe();
-      setUser(me);
-      await AsyncStorage.setItem(USER_KEY, JSON.stringify(me));
+      const meResponse = await api.getMe();
+      const me = meResponse?.user || meResponse;
+
+      if (me) {
+        setUser(me);
+        await AsyncStorage.setItem(USER_KEY, JSON.stringify(me));
+      }
     } catch (err) {
-      console.warn('Refresh user failed:', err);
+      console.warn("Refresh user failed:", err);
     }
   }, []);
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, isAuthenticated, login, register, logout, refreshUser }}
+      value={{
+        user,
+        isLoading,
+        isAuthenticated,
+        login,
+        register,
+        logout,
+        refreshUser,
+      }}
     >
       {children}
     </AuthContext.Provider>
@@ -105,6 +200,10 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+
+  if (!ctx) {
+    throw new Error("useAuth must be used within AuthProvider");
+  }
+
   return ctx;
 }
