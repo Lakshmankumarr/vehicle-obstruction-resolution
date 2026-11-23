@@ -34,7 +34,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./FreewayApp
-        run: npm ci
+        run: npm ci --legacy-peer-deps
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
