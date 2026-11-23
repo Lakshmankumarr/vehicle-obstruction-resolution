@@ -109,8 +109,8 @@ export default function ProfileScreen({ navigation }) {
     }
   };
 
-  const memberSince = user?.created_at
-    ? new Date(user.created_at).toLocaleDateString('en-IN', {
+  const memberSince = (user?.created_at || user?.createdAt)
+    ? new Date(user.created_at || user.createdAt).toLocaleDateString('en-IN', {
         month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata',
       })
     : 'Recently';
@@ -166,7 +166,7 @@ export default function ProfileScreen({ navigation }) {
         <SettingRow
           icon="📱"
           title="Phone Number"
-          subtitle={(user?.phone_number || user?.phoneNumber) ? `+91 ${user.phone_number}` : 'Not set'}
+          subtitle={(user?.phoneNumber || user?.phone_number) ? `+91 ${user?.phoneNumber || user?.phone_number}` : 'Not set'}
           style={styles.cardRow}
         />
         <View style={styles.divider} />

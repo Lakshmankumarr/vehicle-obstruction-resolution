@@ -3,7 +3,8 @@ Database engine and session management for FreeWay Community.
 Supports both PostgreSQL (production/docker) and SQLite (testing/local dev).
 """
 import uuid
-from sqlalchemy import create_engine, TypeDecorator, CHAR
+from sqlalchemy import create_engine, TypeDecorator, CHAR, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import declarative_base, sessionmaker
 
@@ -59,6 +60,15 @@ else:
     engine_kwargs["max_overflow"] = settings.DATABASE_MAX_OVERFLOW
 
 engine = create_engine(settings.DATABASE_URL, **engine_kwargs)
+
+if is_sqlite:
+    @event.listens_for(Engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        # Use DELETE mode to avoid Docker volume mount issues with WAL
+        cursor.execute("PRAGMA journal_mode=DELETE")
+        cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

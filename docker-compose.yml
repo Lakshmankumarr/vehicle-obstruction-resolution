@@ -1,8 +1,9 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database (Optional - production only)
   postgres:
+    profiles: ["production", "postgres"]
     image: postgres:15-alpine
     container_name: freeway_postgres
     environment:
@@ -48,7 +49,7 @@ services:
       dockerfile: Dockerfile
     container_name: freeway_backend
     environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-freeway}:${POSTGRES_PASSWORD:-changeme}@postgres:5432/${POSTGRES_DB:-freeway_community}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./freeway.db}
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY:-freeway-jwt-secret-key-production-ready-32-chars-minimum-token}
       - ALGORITHM=HS256
@@ -78,8 +79,6 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     networks:

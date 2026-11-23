@@ -12,11 +12,16 @@
       "adaptiveIcon": {
         "backgroundColor": "#0B0F19"
       },
-      "package": "com.freeway.community"
+      "package": "com.freewaycommunity.app"
     },
     "updates": {
       "enabled": false,
       "checkAutomatically": "NEVER"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "1bc530e3-7920-4593-b6ac-1cfba6738bfd"
+      }
     }
   }
 }

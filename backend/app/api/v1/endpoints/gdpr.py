@@ -38,9 +38,9 @@ async def export_user_data(
     sent_requests = db.query(Request).filter(Request.requesterId == user_id).all()
     received_requests = db.query(Request).filter(Request.targetUserId == user_id).all()
     reports_made = db.query(Report).filter(Report.reporterId == user_id).all()
-    reports_received = db.query(Report).filter(Report.reportedUserId == user_id).all()
+    reports_received = db.query(Report).filter(Report.targetUserId == user_id).all()
     device_tokens = db.query(DeviceToken).filter(DeviceToken.userId == user_id).all()
-    audit_logs = db.query(AuditLog).filter(AuditLog.userId == user_id).order_by(AuditLog.timestamp.desc()).limit(1000).all()
+    audit_logs = db.query(AuditLog).filter(AuditLog.userId == user_id).order_by(AuditLog.createdAt.desc()).limit(1000).all()
 
     export_data = {
         "export_metadata": {
@@ -111,7 +111,8 @@ async def export_user_data(
         "reports_made": [
             {
                 "id": str(r.id),
-                "reportedUserId": str(r.reportedUserId),
+                "targetUserId": str(r.targetUserId),
+                "reportedUserId": str(r.targetUserId),
                 "reason": r.reason,
                 "description": r.description,
                 "status": r.status,
@@ -149,7 +150,7 @@ async def export_user_data(
                 "details": a.details,
                 "ipAddress": a.ipAddress,
                 "userAgent": a.userAgent,
-                "timestamp": a.timestamp.isoformat() if a.timestamp else None
+                "timestamp": a.createdAt.isoformat() if a.createdAt else None
             }
             for a in audit_logs
         ]
@@ -208,7 +209,7 @@ async def delete_account(
     db.query(Report).filter(Report.reporterId == user_id).delete()
 
     # 3. Update reports received (anonymize reporter)
-    db.query(Report).filter(Report.reportedUserId == user_id).update({
+    db.query(Report).filter(Report.targetUserId == user_id).update({
         "reporterId": None,
         "description": "[Account deleted - GDPR Article 17]"
     })

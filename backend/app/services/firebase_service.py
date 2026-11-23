@@ -14,23 +14,23 @@ from app.core.config import settings
 class FirebaseService:
     """
     Firebase Cloud Messaging service for push notifications
-    
+
     Validates:
     - Requirement 10.1: Push notification delivery via Firebase
     - Requirement 16.1: Device token storage and management
     - Requirement 16.2: Multiple device support per user
     - Requirement 16.3: Platform type recording (iOS/Android)
     """
-    
+
     _instance: Optional['FirebaseService'] = None
     _initialized: bool = False
-    
+
     def __new__(cls):
         """Singleton pattern to ensure only one Firebase instance"""
         if cls._instance is None:
             cls._instance = super(FirebaseService, cls).__new__(cls)
         return cls._instance
-    
+
     def initialize(self):
         """Initialize Firebase Admin SDK (lazy initialization)"""
         if not FirebaseService._initialized:
@@ -42,7 +42,7 @@ class FirebaseService:
                         "Firebase notifications will not work."
                     )
                     return
-                
+
                 # Initialize Firebase with service account credentials
                 cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
                 firebase_admin.initialize_app(cred)
@@ -51,10 +51,32 @@ class FirebaseService:
             except Exception as e:
                 logger.error(f"Failed to initialize Firebase Admin SDK: {e}")
                 raise
-    
+
     def is_initialized(self) -> bool:
         """Check if Firebase is initialized"""
         return FirebaseService._initialized
+
+    def send_push(self, token: str, title: str, body: str, data: dict = None):
+        """Send push notification to a single device token"""
+        if not self.is_initialized():
+            logger.warning("Firebase not initialized, cannot send push")
+            return False
+
+        try:
+            message = messaging.Message(
+                notification=messaging.Notification(
+                    title=title,
+                    body=body,
+                ),
+                data=data or {},
+                token=token,
+            )
+            response = messaging.send(message)
+            logger.info(f"Push notification sent: {response}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send push notification: {e}")
+            return False
 
 
 # Global Firebase service instance

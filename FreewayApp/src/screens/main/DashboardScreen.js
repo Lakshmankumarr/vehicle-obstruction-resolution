@@ -93,6 +93,8 @@ export default function DashboardScreen({ navigation }) {
     useCallback(() => {
       setLoading(true);
       load().finally(() => setLoading(false));
+      const interval = setInterval(load, 5000);
+      return () => clearInterval(interval);
     }, [load]),
   );
 

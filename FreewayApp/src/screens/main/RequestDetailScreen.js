@@ -16,7 +16,7 @@ import { StatusBadge } from '../../components/StatusBadge';
 import { PlateDisplay } from '../../components/PlateDisplay';
 import { colors, spacing, radius } from '../../theme';
 
-const ACTIVE_STATUSES = ['PENDING', 'NOTIFIED', 'ACKNOWLEDGED', 'MOVING'];
+const ACTIVE_STATUSES = ['PENDING', 'NOTIFIED', 'ACKNOWLEDGED', 'MOVING', 'ON_MY_WAY', 'CANNOT_MOVE'];
 
 export default function RequestDetailScreen({ route, navigation }) {
   const { requestId, request: initialRequest } = route.params;
@@ -44,10 +44,10 @@ export default function RequestDetailScreen({ route, navigation }) {
     load().finally(() => setLoading(false));
   }, [load]);
 
-  // Auto-poll while active
+  // Auto-poll while active (every 4 seconds)
   useEffect(() => {
     if (request && ACTIVE_STATUSES.includes(request.status)) {
-      pollRef.current = setInterval(load, 15000);
+      pollRef.current = setInterval(load, 4000);
     }
     return () => clearInterval(pollRef.current);
   }, [request?.status, load]);

@@ -1,36 +1,51 @@
 @echo off
+setlocal
 echo ========================================================
-echo FreeWay Community Backend - Start Options
+echo FreeWay Community Backend - Fast Launcher
 echo ========================================================
 echo.
-echo [1] Local Development (requires Python 3.11+, PostgreSQL, Redis)
-echo [2] Docker Development (requires Docker Desktop)
-echo [3] Docker Production (requires Docker Desktop + .env config)
+echo [1] Fast Local Development (Press Enter - Instant Start)
+echo [2] Install/Update Dependencies + Start
+echo [3] Docker Development
+echo [4] Docker Production
 echo.
-set /p choice="Select option [1-3]: "
+set "choice=1"
+set /p choice="Select option [1-4] (Default: 1): "
 
-if "%choice%"=="1" goto :local
-if "%choice%"=="2" goto :dockerdev
-if "%choice%"=="3" goto :dockerprod
-echo Invalid choice.
+if "%choice%"=="1" goto :fast_local
+if "%choice%"=="2" goto :install_local
+if "%choice%"=="3" goto :dockerdev
+if "%choice%"=="4" goto :dockerprod
+goto :fast_local
+
+:fast_local
+echo.
+echo Starting FastAPI Backend instantly...
+cd /d "%~dp0backend"
+set PYTHONPATH=%cd%
+if exist venv\Scripts\activate.bat (
+    call venv\Scripts\activate.bat
+)
+python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 pause
 goto :eof
 
-:local
+:install_local
 echo.
-echo Starting local development server...
-echo Make sure PostgreSQL and Redis are running!
-echo.
+echo Checking/Installing dependencies...
 cd /d "%~dp0backend"
+set PYTHONPATH=%cd%
 if not exist venv (
     echo Creating virtual environment...
     python -m venv venv
 )
-call venv\Scripts\activate
+if exist venv\Scripts\activate.bat (
+    call venv\Scripts\activate.bat
+)
 pip install -r requirements.txt
 if not exist .env (
     copy .env.example .env
-    echo Created .env from .env.example - please edit with your settings
+    echo Created .env from .env.example
 )
 python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 pause

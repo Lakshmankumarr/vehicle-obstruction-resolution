@@ -7,11 +7,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies
+# Install system dependencies (including OpenCV requirements)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     curl \
+    libglib2.0-0 \
+    libgl1 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -27,8 +33,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create directories for logs and uploads
-RUN mkdir -p /app/logs /app/uploads && chown -R appuser:appuser /app
+# Create directories for logs, uploads, and data (for SQLite)
+RUN mkdir -p /app/logs /app/uploads /data && chown -R appuser:appuser /app /data
 
 # Switch to non-root user
 USER appuser

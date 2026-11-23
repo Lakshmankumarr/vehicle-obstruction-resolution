@@ -28,6 +28,9 @@ class NotificationService:
         try:
             if self.provider == "firebase" and settings.FIREBASE_CREDENTIALS_PATH:
                 from app.services.firebase_service import firebase_service
+                # Ensure Firebase is initialized
+                if not firebase_service.is_initialized():
+                    firebase_service.initialize()
                 for t in tokens:
                     firebase_service.send_push(token=t, title=title, body=body, data=data)
             else:

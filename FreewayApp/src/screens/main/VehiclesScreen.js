@@ -105,7 +105,7 @@ export default function VehiclesScreen() {
   const handleDelete = (vehicle) => {
     Alert.alert(
       'Remove Vehicle?',
-      `Remove ${vehicle.vehicle_number} from your account?`,
+      `Remove ${vehicle.vehicle_number || vehicle.vehicleNumber} from your account?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {

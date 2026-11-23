@@ -1,0 +1,44 @@
+version: '3.8'
+
+# Development compose - SQLite, no Nginx/SSL, hot reload
+# Usage: docker-compose -f docker-compose.dev.yml up --build
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: freeway_backend_dev
+    volumes:
+      - ./backend:/app
+      - ./backend/logs:/app/logs
+      - freeway_data:/data
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - NOTIFICATION_PROVIDER=firebase
+      - ALPR_PROVIDER=mock
+      - DATABASE_URL=sqlite:////data/freeway.db
+      - REDIS_URL=redis://redis:6379/0
+      - FIREBASE_CREDENTIALS_PATH=/app/firebase-credentials.json
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    container_name: freeway_redis_dev
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  freeway_data:

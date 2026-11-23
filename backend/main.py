@@ -139,11 +139,12 @@ def ready():
     """Readiness probe - returns OK if application can serve traffic"""
     from app.core.database import engine
     from app.core.redis import get_redis_client
+    from sqlalchemy import text
 
     # Check database connectivity
     try:
         with engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1"))
     except Exception as e:
         logger.error("Database readiness check failed: {}", e)
         return {"status": "not_ready", "database": "disconnected", "error": str(e)}
