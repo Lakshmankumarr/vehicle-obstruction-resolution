@@ -12,6 +12,7 @@ import React, {
 } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { api } from "../api/client";
+import { registerForPushNotificationsAsync, setupNotificationListeners } from "../services/notificationService";
 
 const AuthContext = createContext(null);
 
@@ -137,6 +138,13 @@ export function AuthProvider({ children }) {
     await AsyncStorage.setItem(USER_KEY, JSON.stringify(normalizedUser));
     setIsAuthenticated(true);
 
+    // Register for push notifications after successful login
+    try {
+      await registerForPushNotificationsAsync(normalizedUser.id);
+    } catch (e) {
+      console.warn("Failed to register for push notifications:", e);
+    }
+
     return normalizedUser;
   }, []);
 
@@ -163,6 +171,13 @@ export function AuthProvider({ children }) {
         setUser(me);
         await AsyncStorage.setItem(USER_KEY, JSON.stringify(me));
         setIsAuthenticated(true);
+
+        // Register for push notifications after successful registration
+        try {
+          await registerForPushNotificationsAsync(me.id);
+        } catch (e) {
+          console.warn("Failed to register for push notifications:", e);
+        }
       }
 
       return me || data;

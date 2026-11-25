@@ -51,7 +51,7 @@ export default function RegisterScreen({ navigation }) {
       Alert.alert(
         'Account Created! 🎉',
         'Your account has been created. Please sign in.',
-        [{ text: 'Sign In', onPress: () => navigation.navigate('Login') }],
+        [{ text: 'Sign In', onPress: () => { const result = navigation.navigate('Login'); if (result && typeof result.catch === 'function') result.catch(() => {}); } }],
       );
     } catch (err) {
       Alert.alert('Registration Failed', err.message || 'Could not create account.');
@@ -142,7 +142,7 @@ export default function RegisterScreen({ navigation }) {
 
         <TouchableOpacity
           style={styles.loginLink}
-          onPress={() => navigation.navigate('Login')}
+          onPress={() => { const result = navigation.navigate('Login'); if (result && typeof result.catch === 'function') result.catch(() => {}); }}
         >
           <Text style={styles.loginText}>
             Already registered?{' '}

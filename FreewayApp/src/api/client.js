@@ -165,6 +165,14 @@ class ApiClient {
   async getPrivacyPolicy() {
     return this.request("/gdpr/privacy-policy", { method: "GET" });
   }
+
+  // --- Device Token Registration ---
+  async registerDeviceToken(token, deviceType = 'ANDROID') {
+    return this.request("/notification/device-token", {
+      method: "POST",
+      body: JSON.stringify({ token, deviceType }),
+    });
+  }
 }
 
 export const api = new ApiClient();
