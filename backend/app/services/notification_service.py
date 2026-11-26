@@ -32,7 +32,11 @@ class NotificationService:
                 if not firebase_service.is_initialized():
                     firebase_service.initialize()
                 for t in tokens:
-                    firebase_service.send_push(token=t, title=title, body=body, data=data)
+                    # Skip test/invalid tokens
+                    if t and not t.startswith("test-") and len(t) > 50:
+                        firebase_service.send_push(token=t, title=title, body=body, data=data)
+                    else:
+                        logger.info(f"Skipping test/invalid FCM token: {t[:20]}...")
             else:
                 # Mock / Console mode
                 logger.info("[PUSH NOTIFICATION] To {} tokens | Title: {} | Body: {} | Data: {}", len(tokens), title, body, data)

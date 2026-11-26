@@ -59,6 +59,24 @@ class DeviceTokenService:
             return True
         return False
 
+    def toggle_token(
+        self,
+        db: Session,
+        user_id: UUID,
+        token: str,
+        enabled: bool
+    ) -> bool:
+        """Activates or deactivates a user's device token."""
+        tok = db.query(DeviceToken).filter(
+            DeviceToken.token == token,
+            DeviceToken.userId == user_id
+        ).first()
+        if not tok:
+            return False
+        tok.isActive = enabled
+        db.commit()
+        return True
+
     def cleanup_stale_tokens(self, db: Session, max_inactive_days: int = 90) -> int:
         """
         Removes inactive or expired device tokens older than max_inactive_days.

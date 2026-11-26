@@ -44,3 +44,21 @@ def unregister_device_token(
         success=True,
         message="Device token unregistered successfully."
     )
+
+@router.post("/toggle-device-token", response_model=RegisterDeviceResponse)
+def toggle_device_token(
+    req: RegisterDeviceRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Toggles a device token's active state for the authenticated user."""
+    device_token_service.toggle_token(
+        db=db,
+        user_id=current_user.id,
+        token=req.token,
+        enabled=req.enabled
+    )
+    return RegisterDeviceResponse(
+        success=True,
+        message="Device token toggled successfully."
+    )

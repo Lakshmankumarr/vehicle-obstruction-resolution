@@ -173,6 +173,13 @@ class ApiClient {
       body: JSON.stringify({ token, deviceType }),
     });
   }
+
+  async toggleDeviceToken(token, enabled) {
+    return this.request("/notification/toggle-device-token", {
+      method: "POST",
+      body: JSON.stringify({ token, enabled, deviceType: "ANDROID" }),
+    });
+  }
 }
 
 export const api = new ApiClient();

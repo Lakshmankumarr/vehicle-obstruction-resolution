@@ -57,6 +57,13 @@ export function AuthProvider({ children }) {
             setUser(me);
             await AsyncStorage.setItem(USER_KEY, JSON.stringify(me));
             setIsAuthenticated(true);
+
+            // Register for push notifications after restoring session
+            try {
+              await registerForPushNotificationsAsync(me.id);
+            } catch (e) {
+              console.warn("Failed to register push notifications on session restore:", e);
+            }
           }
         } catch {
           await clearSession();

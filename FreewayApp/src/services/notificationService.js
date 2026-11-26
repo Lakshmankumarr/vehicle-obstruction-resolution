@@ -6,6 +6,9 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { api } from '../api/client';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const DEVICE_TOKEN_KEY = '@freeway:device_token';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -48,10 +51,11 @@ export async function registerForPushNotificationsAsync(userId) {
     console.warn('Must use physical device for Push Notifications');
   }
 
-  // Register token with backend
+  // Register token with backend and persist locally
   if (token) {
     try {
       await api.registerDeviceToken(token, 'ANDROID');
+      await AsyncStorage.setItem(DEVICE_TOKEN_KEY, token);
       console.log('FCM token registered with backend:', token);
     } catch (error) {
       console.error('Failed to register device token:', error);

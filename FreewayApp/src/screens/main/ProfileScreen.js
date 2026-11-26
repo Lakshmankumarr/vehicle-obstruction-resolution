@@ -2,15 +2,18 @@
  * FreeWay Community — ProfileScreen
  * User profile, account info, privacy settings, and logout.
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Switch,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../api/client';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { colors, spacing, radius } from '../../theme';
+
+const DEVICE_TOKEN_KEY = '@freeway:device_token';
 
 function SettingRow({ icon, title, subtitle, onPress, rightElement, style }) {
   const Inner = (
@@ -31,6 +34,20 @@ export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
   const [notifications, setNotifications] = useState(true);
   const [emergencyAlerts, setEmergencyAlerts] = useState(true);
+
+  const handleToggleNotifications = async (value) => {
+    setNotifications(value);
+    try {
+      const token = await AsyncStorage.getItem(DEVICE_TOKEN_KEY);
+      if (!token) {
+        console.warn('No device token stored locally.');
+        return;
+      }
+      await api.toggleDeviceToken(token, value);
+    } catch (e) {
+      console.warn('Failed to toggle push notifications:', e);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert('Sign Out?', 'You will need to sign in again.', [
@@ -189,7 +206,7 @@ export default function ProfileScreen({ navigation }) {
           rightElement={
             <Switch
               value={notifications}
-              onValueChange={setNotifications}
+              onValueChange={handleToggleNotifications}
               trackColor={{ false: colors.inputBorder, true: colors.primary }}
               thumbColor="#fff"
             />

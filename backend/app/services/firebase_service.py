@@ -33,9 +33,25 @@ class FirebaseService:
 
     def initialize(self):
         """Initialize Firebase Admin SDK (lazy initialization)"""
-        if not FirebaseService._initialized:
+        if FirebaseService._initialized:
+            logger.info("Firebase already initialized, skipping")
+            return
+
+        try:
+            # Check if credentials file exists
+            if not os.path.exists(settings.FIREBASE_CREDENTIALS_PATH):
+                logger.warning(
+                    f"Firebase credentials file not found: {settings.FIREBASE_CREDENTIALS_PATH}. "
+                    "Firebase notifications will not work."
+                )
+                return
+
+            # Check if Firebase app already exists
             try:
-                # Check if credentials file exists
+                firebase_admin.get_app()
+                logger.info("Firebase Admin SDK already initialized")
+            except ValueError:
+                # No app exists, initialize it
                 if not os.path.exists(settings.FIREBASE_CREDENTIALS_PATH):
                     logger.warning(
                         f"Firebase credentials file not found: {settings.FIREBASE_CREDENTIALS_PATH}. "
@@ -46,11 +62,12 @@ class FirebaseService:
                 # Initialize Firebase with service account credentials
                 cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
                 firebase_admin.initialize_app(cred)
-                FirebaseService._initialized = True
                 logger.info("Firebase Admin SDK initialized successfully")
-            except Exception as e:
-                logger.error(f"Failed to initialize Firebase Admin SDK: {e}")
-                raise
+
+            FirebaseService._initialized = True
+        except Exception as e:
+            logger.error(f"Failed to initialize Firebase Admin SDK: {e}")
+            raise
 
     def is_initialized(self) -> bool:
         """Check if Firebase is initialized"""
@@ -70,12 +87,33 @@ class FirebaseService:
                 ),
                 data=data or {},
                 token=token,
+                android=messaging.AndroidConfig(
+                    priority="high",
+                    notification=messaging.AndroidNotification(
+                        channel_id="freeway_notifications",
+                        priority="high",
+                        default_sound=True,
+                        default_vibrate_timings=True,
+                    ),
+                ),
+                apns=messaging.APNSConfig(
+                    payload=messaging.APNSPayload(
+                        aps=messaging.Aps(
+                            sound="default",
+                            badge=1,
+                            content_available=True,
+                        )
+                    ),
+                ),
             )
             response = messaging.send(message)
             logger.info(f"Push notification sent: {response}")
             return True
         except Exception as e:
             logger.error(f"Failed to send push notification: {e}")
+            # Log specific error for debugging
+            if "registration token" in str(e).lower() or "invalid" in str(e).lower():
+                logger.warning(f"Invalid FCM token: {token[:20]}...")
             return False
 
 
